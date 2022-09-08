@@ -1,3 +1,4 @@
+require("dotenv").config();
 const { response } = require("express");
 const { validationResult } = require("express-validator");
 const { default: mongoose } = require("mongoose");
@@ -38,7 +39,7 @@ const Login = async (req, res) => {
       jwt.sign(
         { _id: user._id },
         process.env.JWTKEY,
-        { expiresIn: "500s" },
+        { expiresIn: process.env.LOGIN_TOKEN_EXPIRY_TIME },
         (err, token) => {
           if (err) {
             return res.status(500).json({
@@ -75,6 +76,7 @@ const Login = async (req, res) => {
               user_id: user._id,
               company_id: user.company_id,
               token: token,
+              token_expiry_time: process.env.LOGIN_TOKEN_EXPIRY_TIME,
             };
             return res.status(200).json({
               status: true,
