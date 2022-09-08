@@ -54,8 +54,15 @@ let UserSchema = new mongoose.Schema(
     profile_pic: {
       type: String,
     },
+    remember_token: {
+      type: String,
+    },
   },
   { timestamps: true }
 );
+
+UserSchema.methods.isUserActive = () => {
+  return this.Active == 1;
+};
 
 const User = (module.exports = mongoose.model("users", UserSchema));

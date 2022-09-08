@@ -1,9 +1,7 @@
-const { validationResult, Result } = require("express-validator");
+require("dotenv").config();
+const { validationResult } = require("express-validator");
 const { default: mongoose } = require("mongoose");
 const Company = require("../models/Company");
-require("dotenv").config();
-const bcrypt = require("bcrypt");
-const Role = require("../models/Role");
 const ejs = require("ejs");
 const PasswordReset = require("../models/PasswordReset");
 const User = require("../models/User");
@@ -11,73 +9,76 @@ const crypto = require("crypto");
 const sendMail = require("../services/email");
 const path = require("path");
 const { setPassword } = require("../services/hash");
+const FindRole = require("../services/findRole");
 
 const Register = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array().shift() });
+    return res.status(422).json({
+      status: false,
+      status_code: 422,
+      errors: errors.array().shift(),
+    });
   }
+
+  //find role id
   var role;
-  var promise = Role.findOne({ name: "company_owner" }).select("_id").exec();
-  await promise.then(function (user) {
-    role = user;
-  });
-  const session = await mongoose.startSession();
+  await FindRole("company_owner").then(
+    (result) => (role = result._id),
+    (err) => {
+      return res.status(500).json({
+        status: false,
+        status_code: 500,
+        message: "Something went wrong, Please try again later.",
+      });
+    }
+  );
+  let session = await mongoose.startSession();
   session.startTransaction();
+
   try {
-    const opts = { session, new: true };
-    const company = new Company({
-      _id: mongoose.Types.ObjectId(),
-      name: req.body.organization,
-      email: req.body.email,
-    });
+    //create company
+    const company = await Company.create(
+      [
+        {
+          _id: mongoose.Types.ObjectId(),
+          name: req.body.organization,
+          email: req.body.email,
+        },
+      ],
+      { session: session }
+    );
 
-    const user = new User({
-      _id: mongoose.Types.ObjectId(),
-      company_id: company._id,
-      first_name: req.body.first_name,
-      last_name: req.body.last_name,
-      email: req.body.email,
-      role_id: role._id,
-    });
+    //create user
+    const user = await User.create(
+      [
+        {
+          _id: mongoose.Types.ObjectId(),
+          company_id: company[0]._id,
+          first_name: req.body.first_name,
+          last_name: req.body.last_name,
+          email: req.body.email,
+          role_id: role,
+        },
+      ],
+      { session: session }
+    );
 
+    //create token for generate password
     let token = crypto.randomBytes(32).toString("hex");
 
-    const passwordGenerate = new PasswordReset({
-      email: req.body.email,
-      token: token,
-    });
+    //create entry for generate password
+    await PasswordReset.create(
+      [
+        {
+          email: req.body.email,
+          token: token,
+        },
+      ],
+      { session: session }
+    );
 
-    company.save({ opts }).catch(async (err) => {
-      await session.commitTransaction();
-      session.endSession();
-      res.status(500).json({
-        status: false,
-        status_code: 500,
-        message: "Something went wrong, Please try again later.",
-      });
-    });
-
-    user.save({ opts }).catch(async (err) => {
-      await session.commitTransaction();
-      session.endSession();
-      res.status(500).json({
-        status: false,
-        status_code: 500,
-        message: "Something went wrong, Please try again later.",
-      });
-    });
-
-    passwordGenerate.save({ opts }).catch(async (err) => {
-      await session.commitTransaction();
-      session.endSession();
-      res.status(500).json({
-        status: false,
-        status_code: 500,
-        message: "Something went wrong, Please try again later.",
-      });
-    });
-
+    //send generate password mail
     ejs.renderFile(
       path.join(__dirname, "../views/emails/generate-password.ejs"),
       {
@@ -88,11 +89,11 @@ const Register = async (req, res) => {
           token,
         token_expiry_time: process.env.PASSWORD_TOKEN_EXPIRY_TIME,
       },
-      (err, data) => {
+      async (err, data) => {
         if (err) {
-          session.commitTransaction();
+          await session.abortTransaction();
           session.endSession();
-          res.status(500).json({
+          return res.status(500).json({
             status: false,
             status_code: 500,
             message: "Something went wrong, Please try again later.",
@@ -104,11 +105,11 @@ const Register = async (req, res) => {
           subject: "Password generate request",
           html: data,
         };
-        sendMail.sendMail(mainOptions, (err, info) => {
+        sendMail.sendMail(mainOptions, async (err, info) => {
           if (err) {
-            session.commitTransaction();
+            await session.abortTransaction();
             session.endSession();
-            res.status(500).json({
+            return res.status(500).json({
               status: false,
               status_code: 500,
               message: "Something went wrong, Please try again later.",
@@ -117,33 +118,37 @@ const Register = async (req, res) => {
         });
       }
     );
-
-    await session.commitTransaction();
-    session.endSession();
-    res.status(201).json({
-      status: true,
-      status_code: 201,
-      message: "Registration Successful.",
-    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    res.status(500).json({
+    return res.status(500).json({
       status: false,
       status_code: 500,
       message: "Something went wrong, Please try again later.",
     });
   }
+  await session.commitTransaction();
+  session.endSession();
+  return res.status(201).json({
+    status: true,
+    status_code: 201,
+    message: "Registration Successful.",
+  });
 };
 
 const GeneratePassword = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array().shift() });
+    return res.status(422).json({
+      status: false,
+      status_code: 422,
+      errors: errors.array().shift(),
+    });
   }
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
+    const opts = { session, new: true };
     let hash = setPassword(req.body.password);
     hash.then((value) => {
       User.updateOne(
@@ -157,7 +162,7 @@ const GeneratePassword = async (req, res) => {
             session.endSession();
             reject(new Error("Server Error"));
           }
-          PasswordReset.findOne({ email: req.body.email })
+          PasswordReset.findOne({ email: req.body.email }, { opts })
             .remove()
             .then((result) => {
               session.commitTransaction();
@@ -182,7 +187,145 @@ const GeneratePassword = async (req, res) => {
   }
 };
 
+const Remind = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      status: false,
+      status_code: 422,
+      errors: errors.array().shift(),
+    });
+  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    //create token for generate password
+    let token = crypto.randomBytes(32).toString("hex");
+
+    //create entry for generate password
+    await PasswordReset.create(
+      [
+        {
+          email: req.body.email,
+          token: token,
+        },
+      ],
+      { session: session }
+    );
+
+    //send generate password mail
+    ejs.renderFile(
+      path.join(__dirname, "../views/emails/reset-password.ejs"),
+      {
+        url:
+          "http://localhost:5000/generate-password?email=" +
+          req.body.email +
+          "token=" +
+          token,
+        token_expiry_time: process.env.PASSWORD_TOKEN_EXPIRY_TIME,
+      },
+      async (err, data) => {
+        if (err) {
+          console.warn(err);
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(500).json({
+            status: false,
+            status_code: 500,
+            message: "Something went wrong, Please try again later.",
+          });
+        }
+        var mainOptions = {
+          from: process.env.EMAIL_USER_NAME,
+          to: req.body.email,
+          subject: "Password generate request",
+          html: data,
+        };
+        sendMail.sendMail(mainOptions, async (err, info) => {
+          if (err) {
+            console.warn(err);
+            await session.abortTransaction();
+            session.endSession();
+            return res.status(500).json({
+              status: false,
+              status_code: 500,
+              message: "Something went wrong, Please try again later.",
+            });
+          }
+        });
+      }
+    );
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    return res.status(500).json({
+      status: false,
+      status_code: 500,
+      message: "Something went wrong, Please try again later.",
+    });
+  }
+  await session.commitTransaction();
+  session.endSession();
+  return res.status(200).json({
+    status: true,
+    status_code: 200,
+    message: "Check your email.",
+  });
+};
+
+const ResetPassword = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(422).json({
+      status: false,
+      status_code: 422,
+      errors: errors.array().shift(),
+    });
+  }
+  let session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    let hash = setPassword(req.body.password);
+    hash.then((value) => {
+      User.updateOne(
+        { email: { $gte: req.body.email } },
+        {
+          hash: value,
+        },
+        (err, user) => {
+          if (err) {
+            session.abortTransaction();
+            session.endSession();
+            reject(new Error("Server Error"));
+          }
+          PasswordReset.findOne({ email: req.body.email })
+            .remove()
+            .then((result) => {
+              session.commitTransaction();
+              session.endSession();
+              res.status(200).json({
+                status: true,
+                status_code: 200,
+                message: "Password changed successfully.",
+              });
+            });
+        }
+      );
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({
+      status: false,
+      status_code: 500,
+      message: "Something went wrong, Please try again later.",
+    });
+  }
+};
+
 module.exports = {
   Register,
   GeneratePassword,
+  Remind,
+  ResetPassword,
 };

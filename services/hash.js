@@ -15,10 +15,12 @@ const setPassword = async (password) => {
 };
 
 const validatePassword = async (password, hash) => {
-  var promise = User.findOne({ email: this.email }).select("+hash").exec();
-  await promise.then(function (user) {
-    bcrypt.compare(password, user.hash, function (err, result) {
-      return result;
+  return new Promise((resolve, reject) => {
+    bcrypt.compare(password, hash, function (err, result) {
+      if (err) {
+        reject(new Error("Server Error"));
+      }
+      resolve(result);
     });
   });
 };
