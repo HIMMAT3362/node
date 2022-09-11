@@ -35,6 +35,6 @@ router.put("/reset-password", jsonParser, PasswordValidation, ResetPassword);
 
 router.post("/login", jsonParser, LoginValidation, Login);
 
-router.post("/logout", ValidateToken, jsonParser,  Logout);
+router.post("/logout", ValidateToken, jsonParser, Logout);
 
 module.exports = router;
