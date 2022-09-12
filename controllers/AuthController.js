@@ -29,7 +29,10 @@ const Login = async (req, res) => {
         message: "No user found.",
       });
     }
-    if (!company.Active || !user.Active) {
+    if (
+      !(await company.checkActive(company.email)) ||
+      !(await user.checkActive(user.email))
+    ) {
       return res.status(400).json({
         status: false,
         status_code: 400,
@@ -37,7 +40,7 @@ const Login = async (req, res) => {
       });
     } else {
       jwt.sign(
-        { _id: user._id },
+        { _id: user._id, company_id: user.company_id, role_id: user.role_id },
         process.env.JWTKEY,
         { expiresIn: process.env.LOGIN_TOKEN_EXPIRY_TIME },
         (err, token) => {

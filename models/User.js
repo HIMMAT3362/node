@@ -5,8 +5,9 @@ let UserSchema = new mongoose.Schema(
   {
     _id: mongoose.Schema.Types.ObjectId,
     company_id: {
-      required: true,
       type: mongoose.Schema.Types.ObjectId,
+      ref: "companies",
+      required: true,
     },
     first_name: {
       type: String,
@@ -45,24 +46,32 @@ let UserSchema = new mongoose.Schema(
       type: Number,
       required: true,
       Enumerator: [0, 1],
+      select: false,
       default: 1,
     },
     role_id: {
-      required: true,
       type: mongoose.Schema.Types.ObjectId,
+      ref: "roles",
+      required: true,
     },
     profile_pic: {
       type: String,
     },
     remember_token: {
+      select: false,
       type: String,
     },
   },
   { timestamps: true }
 );
 
-UserSchema.methods.isUserActive = () => {
-  return this.Active == 1;
+UserSchema.methods.checkActive = async (email) => {
+  return new Promise((resolve, reject) => {
+    User.findOne({ email: email })
+      .select("+Active")
+      .then((result) => resolve(result.Active == 1))
+      .catch((err) => reject(new Error("Serror error.")));
+  });
 };
 
 const User = (module.exports = mongoose.model("users", UserSchema));

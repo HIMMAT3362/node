@@ -10,15 +10,15 @@ const ValidateToken = async (req, res, next) => {
           .status(401)
           .json({ status: false, status_code: 401, message: err.message });
       } else {
-        var check = await User.findOne({ _id: authData._id });
+        var check = await User.findOne({ _id: authData._id }).select(
+          "+remember_token"
+        );
         if (!check.remember_token) {
-          return res
-            .status(401)
-            .json({
-              status: false,
-              status_code: 401,
-              message: "unauthorized.",
-            });
+          return res.status(401).json({
+            status: false,
+            status_code: 401,
+            message: "unauthorized.",
+          });
         }
         req.authData = authData;
         next();

@@ -8,7 +8,9 @@ const {
   ResetPassword,
   Remind,
 } = require("../controllers/AuthenticationController");
+const { getTeamList, addMember } = require("../controllers/TeamController");
 const ValidateToken = require("../middlewares/validateToken");
+const User = require("../models/User");
 
 const {
   SignUpValidation,
@@ -36,5 +38,9 @@ router.put("/reset-password", jsonParser, PasswordValidation, ResetPassword);
 router.post("/login", jsonParser, LoginValidation, Login);
 
 router.post("/logout", ValidateToken, jsonParser, Logout);
+
+router.get("/get-team-list", ValidateToken, getTeamList);
+
+router.post("/add-member", ValidateToken, jsonParser, addMember);
 
 module.exports = router;

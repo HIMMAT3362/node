@@ -35,13 +35,24 @@ let CompanySchema = new mongoose.Schema(
       type: Number,
       required: true,
       Enumerator: [0, 1],
+      select: false,
       default: 1,
     },
     logo: {
       type: String,
     },
+    users_id: [{ type: mongoose.Schema.Types.ObjectId, ref: "users" }],
   },
   { timestamps: true }
 );
+
+CompanySchema.methods.checkActive = async (email) => {
+  return new Promise((resolve, reject) => {
+    Company.findOne({ email: email })
+      .select("+Active")
+      .then((result) => resolve(result.Active == 1))
+      .catch((err) => reject(new Error("Serror error.")));
+  });
+};
 
 const Company = (module.exports = mongoose.model("companies", CompanySchema));

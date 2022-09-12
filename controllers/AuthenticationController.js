@@ -54,7 +54,7 @@ const Register = async (req, res) => {
       [
         {
           _id: mongoose.Types.ObjectId(),
-          company_id: company[0]._id,
+          company_details: company[0]._id,
           first_name: req.body.first_name,
           last_name: req.body.last_name,
           email: req.body.email,
@@ -85,7 +85,7 @@ const Register = async (req, res) => {
         url:
           "http://localhost:5000/generate-password?email=" +
           req.body.email +
-          "token=" +
+          "&token=" +
           token,
         token_expiry_time: process.env.PASSWORD_TOKEN_EXPIRY_TIME,
       },

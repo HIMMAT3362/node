@@ -5,6 +5,7 @@ let RoleSchema = new mongoose.Schema(
     name: {
       required: true,
       type: String,
+      select: false,
     },
     display_name: {
       required: true,
@@ -15,9 +16,12 @@ let RoleSchema = new mongoose.Schema(
       required: true,
       Enumerator: [0, 1],
       default: 1,
+      select: false,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true
+  }
 );
 
 const Role = (module.exports = mongoose.model("roles", RoleSchema));
