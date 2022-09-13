@@ -54,7 +54,7 @@ const Register = async (req, res) => {
       [
         {
           _id: mongoose.Types.ObjectId(),
-          company_details: company[0]._id,
+          company_id: company[0]._id,
           first_name: req.body.first_name,
           last_name: req.body.last_name,
           email: req.body.email,
@@ -63,6 +63,20 @@ const Register = async (req, res) => {
       ],
       { session: session }
     );
+
+    //update company details
+    await Company.updateOne(
+      { _id: user.company_id },
+      { $push: { users_id: user[0]._id } }
+    ).catch(async (err) => {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(500).json({
+        status: false,
+        status_code: 500,
+        message: "Something went wrong, Please try again later.",
+      });
+    });
 
     //create token for generate password
     let token = crypto.randomBytes(32).toString("hex");

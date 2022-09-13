@@ -8,6 +8,7 @@ const {
   ResetPassword,
   Remind,
 } = require("../controllers/AuthenticationController");
+const { getRoleList } = require("../controllers/RoleController");
 const { getTeamList, addMember } = require("../controllers/TeamController");
 const ValidateToken = require("../middlewares/validateToken");
 const User = require("../models/User");
@@ -18,6 +19,7 @@ const {
   RemindValidation,
   LoginValidation,
   logoutValidation,
+  AddTeamMemberValidation,
 } = require("../validators/validator");
 const router = express.Router();
 const jsonParser = bodyParser.json();
@@ -41,6 +43,14 @@ router.post("/logout", ValidateToken, jsonParser, Logout);
 
 router.get("/get-team-list", ValidateToken, getTeamList);
 
-router.post("/add-member", ValidateToken, jsonParser, addMember);
+router.get('/get-role-list', ValidateToken, getRoleList);
+
+router.post(
+  "/add-member",
+  ValidateToken,
+  jsonParser,
+  AddTeamMemberValidation,
+  addMember
+);
 
 module.exports = router;
